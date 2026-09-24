@@ -1,0 +1,210 @@
+---
+title: "Nestling CORT 2017"
+output: html_document
+date: "2026-02-05"
+---
+
+```{r}
+rm(list=ls())
+
+##load these first
+library(lattice)
+library(plyr)
+library(Rmisc)
+library(tidyverse)
+#library(conflicted)
+library(dplyr)
+
+##
+library(carData)
+library(effects)
+library(lubridate)
+library(Matrix)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(performance)
+library(effects)
+library(sandwich)
+library(survival)
+library(zoo)
+library(lmtest)
+library(car)
+library(AER)
+library(pscl)
+library(nlme)
+library(wesanderson)
+library(smatr)
+library(magrittr)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(MASS)
+library(tayloRswift)
+```
+
+```{r, reading in data file}
+cort<-read.csv("Nestling.CORT.2017.csv")
+```
+
+```{r, filtering out BHCO nestlings}
+cort<-cort%>%
+  filter(bhco.nestling %in% c("no"))
+```
+
+```{r, turning data into real date}
+#turn all your date column into a real date
+cort$Date = as.Date(cort$Date, "%m/%d/%y")
+cort$Date
+
+#Create "day" column for julian date for analysis
+cort$day.of.year=yday(cort$Date)
+#use day from now on!!!!!!!
+
+#mean center by total (day)
+cort$mean.cent.day<-(cort$day)-(mean(cort$day))
+```
+
+```{r, cort between habitat types}
+
+#Make summary table
+cort.sum<-summarySE(cort, measurevar="Baseline.cort", groupvars=c("Habitat"), na.rm = T)
+
+#Make figure
+Fig.1<-ggplot(cort, aes(x=Habitat, y=Baseline.cort, color = Habitat)) +
+  geom_boxplot(coef = 5, width= 0.5) +
+  geom_point(position = position_jitterdodge(jitter.width = 0.3, dodge.width = 0.9), size=1, stroke=2) +
+  geom_point(stat = 'summary', fun = mean, shape = '+', size = 6,
+             color = 'blue', position = position_dodge(0.9)) +
+  xlab("Habitat") +
+  theme_bw()+
+  theme(panel.grid.major =element_blank(), panel.grid.minor =element_blank())+
+  theme(axis.title.x = element_text(margin = margin(t = 15))) +
+  ylab("Baseline cort (ng/mL)")+
+  guides(color = guide_legend(title = "Habitat"))+
+  scale_color_taylor(palette = "lover")
+Fig.1
+
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='CORT.no.bhco.jpeg', width = 8, height = 6, units = 'in',res=800)
+Fig.1 + theme(legend.position="none")
+dev.off() ##parentheses empty
+```
+
+```{r, Fig.1 BOXPLOT, using this one!!1}
+Fig.1.1 <- ggplot(cort, aes(x=Habitat, y=Baseline.cort, color = Habitat)) +
+  geom_boxplot(coef = 5, width= 0.5) +
+  geom_point(
+    aes(fill = Habitat),
+    shape = 21,
+    color = "black",
+    position = position_jitterdodge(
+      jitter.width = 0.3,
+      dodge.width = 0.9
+    ),
+    size = 4,
+    stroke = .5
+  ) +
+  geom_point(stat = 'summary', fun = mean, shape = '+', size = 6,
+             color = 'blue', position = position_dodge(0.9)) +
+  xlab("Habitat") +
+  theme_classic(base_size = 15, base_family = 'Arial') +
+  theme(axis.title.x = element_text(margin = margin(t = 15))) +
+  ylab("Baseline cort (ng/mL)")+
+  guides(color = guide_legend(title = "Habitat"))+
+  scale_color_manual(values = c("Urban" = "grey60", "Rural" = "green4"))+
+  scale_fill_manual(
+    values = c("Urban" = "grey60", "Rural" = "green4"))+
+  scale_x_discrete(expand = expansion(mult = c(0.1, 0.1)))
+  
+Fig.1.1
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='CORT.no.bhco.boxplot.jpeg', width = 8, height = 6, units = 'in',res=800)
+Fig.1.1 + theme(legend.position="none")
+dev.off() ##parentheses empty
+```
+```{r, fig. 2}
+
+habitat_colors <- c("Urban" = "grey60", "Rural" = "green4")
+
+# Habitat x Day interaction p-value, computed from your data
+fit <- lm(Baseline.cort ~ Habitat * Day, data = cort)
+p_int <- anova(fit)["Habitat:Day", "Pr(>F)"]
+
+fig.2 <- ggplot(cort, aes(x = Day, y = Baseline.cort, color = Habitat, fill = Habitat)) +
+
+  # Regression lines + CI bands first, so points sit on top
+  geom_smooth(
+    method = "lm", se = TRUE,
+    alpha = 0.2, linewidth = 0.9,
+    show.legend = FALSE
+  ) +
+
+  # Black-outlined points, jittered horizontally only
+  geom_point(
+    shape = 21, color = "black", stroke = 0.4,
+    size = 2.5, alpha = 0.9,
+    position = position_jitter(width = 0.1, height = 0, seed = 1)
+  ) +
+
+  annotate(
+    "text", x = Inf, y = -Inf,
+    label = paste0("Habitat \u00d7 Day: p = ", sprintf("%.3f", p_int)),
+    hjust = 1.05, vjust = -1,
+    fontface = "italic", color = "grey40", size = 4
+  ) +
+
+  scale_fill_manual(values = habitat_colors, name = "Habitat") +
+  scale_color_manual(values = habitat_colors, name = "Habitat") +
+  guides(color = "none") +
+  scale_x_continuous(breaks = 5:10) +
+
+  labs(x = "Nestling age (days)", y = "Baseline corticosterone (ng/mL)") +
+
+  theme_classic(base_size = 18) +
+  theme(
+    legend.title = element_text(size = 16),
+    legend.text = element_text(size = 14),
+    legend.position = "inside",
+    legend.position.inside = c(0.18, 0.85),
+    axis.title = element_text(size = 18),
+    axis.text = element_text(size = 15),
+    legend.background = element_blank()
+  )
+
+fig.2
+
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='CORT.no.bhco.trends.jpeg', width = 8, height = 6, units = 'in',res=800)
+fig.2 + theme(legend.position="right")
+dev.off() ##parentheses empty
+```
+
+```{r, cort between habitat types}
+
+#log transforming data
+cort$t.cort<-log(cort$Baseline.cort)
+
+lmm.1<-lmer(t.cort~Habitat+mean.cent.day+Day+(1|NID), data=cort)
+
+#checking to see the contribution of NID to variation in cort... less than 1%
+lmm.7<-lmer(t.cort~1+(1|NID), data=cort)
+
+#Summary plots for the model
+check_model(lmm.1)
+
+hist(residuals(lmm.1))
+
+shapiro.test(residuals(lmm.1))
+
+summary(lmm.7)
+#No real effects here, other than on day but keeping age because it varies so much in the birds we sampled
+plot(allEffects(lmm.1))
+
+res.pro.table <- as.data.frame(coef(summary(lmm.1)))
+#write.csv(res.pro.table,"3.5.26.nestling.cort.results.csv")
+
+```

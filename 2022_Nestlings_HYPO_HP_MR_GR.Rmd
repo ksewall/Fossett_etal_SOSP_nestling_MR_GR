@@ -1,0 +1,280 @@
+---
+title: "Nestling HYPO & HP"
+output: html_document
+date: "2026-02-05"
+---
+
+```{r}
+
+rm(list=ls())
+
+##load these first
+library(lattice)
+library(plyr)
+library(Rmisc)
+library(tidyverse)
+library(dplyr)
+
+##
+library(carData)
+library(effects)
+library(lubridate)
+library(Matrix)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(performance)
+library(effects)
+library(sandwich)
+library(survival)
+library(zoo)
+library(lmtest)
+library(car)
+library(AER)
+library(pscl)
+library(nlme)
+library(wesanderson)
+library(smatr)
+library(magrittr)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(MASS)
+library(tayloRswift)
+
+#R.version.string  # Gives the exact R version
+#citation()        # Gives the official citation for R
+
+```
+
+```{r, reading in data file}
+qpcr.all<-read.csv("2022_Nestling_MR_GR_qPCR_data.csv")
+#MR and GR rows (with ACTB reference values) for both brain regions
+
+#now add nestling sex to the data sheet
+sex.dat<-read.csv("Nestling_sex_4.1.26_dropped_sample_11.csv")
+
+#merge the data sheets
+qpcr.all <-merge(qpcr.all, sex.dat, by= c("SAMPLE.ID"))
+```
+
+```{r, turning data into real date}
+#turn all your date column into a real date
+qpcr.all$Date = as.Date(qpcr.all$Date, "%m/%d/%y")
+qpcr.all$Date
+
+#Create "day" column for julian date for analysis
+qpcr.all$day=yday(qpcr.all$Date)
+#use day from now on!!!!!!!
+
+#mean center by total (day)
+qpcr.all$mean.cent.day<-(qpcr.all$day)-(mean(qpcr.all$day))
+```
+
+```{r, filtering MR and GR}
+mr.gr.dat<-qpcr.all%>%
+  filter(GENE.x %in% c("MR", "GR"))
+#unique(qpcr.all$Cowbird)
+```
+
+```{r, filtering out BHCO nests}
+mr.gr.dat<-mr.gr.dat%>%
+  filter(Cowbird %in% c("No"))
+#unique(qpcr.all$GENE.x)
+#write.csv(mr.gr.dat, "Nestling.MR.GR.HYPO.HP.Master.Datasheet.9.15.26.csv")
+```
+
+```{r}
+#Factor the full data frame so "Urban" comes first
+  mr.gr.dat$Treatment <- factor(mr.gr.dat$Treatment, levels=c("Urban", "Rural"))
+```
+
+```{r}
+# Rename "OldName" to "NewName"
+mr.gr.dat <- mr.gr.dat %>%
+  mutate(
+    Treatment = dplyr::recode(
+      Treatment,
+      "Urban" = "U",
+      "Rural" = "R"
+    )
+  )
+```
+
+```{r, between TREATMENT comparison}
+#Supplemental figure that shows gene expression by treatment and age
+
+#Make summary table
+neuro.sum<-summarySE(mr.gr.dat, measurevar="RQ", groupvars=c("Treatment"), na.rm = T)
+
+#Make figure
+viz<-ggplot(mr.gr.dat, aes(x=Treatment, y=RQ, color=Treatment))+ 
+  geom_jitter(position=position_jitter(w=0.1, h=0.1), shape=1, size=2,  alpha = 0.5 )+
+  geom_errorbar(data = neuro.sum, mapping = aes(x = Treatment, y = RQ,
+                                              ymin = RQ - se, ymax = RQ+ se),
+                linewidth =.5, width=.20,color='black') + 
+  geom_point(data = neuro.sum, mapping = aes(x = Treatment, y= RQ),color='black',
+             size=1,shape=16) + 
+  facet_grid(Age~GENE.x, scales ="free")+
+  theme(panel.grid.major =element_blank(), panel.grid.minor =element_blank())+
+  theme(strip.placement = "outside")+
+  theme_bw()+
+  theme(text =element_text(size =13))+
+  ylab("Relative mRNA expression") +
+  xlab("Habitat")+
+  scale_color_taylor(palette = "lover")
+
+viz + theme(axis.title.x = element_text(size=15),
+           axis.text.x  = element_text(size=12),
+           axis.text.y  = element_text(size=12),
+           axis.title.y = element_text(size=15))
+
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='mr.grXtreatmentXage.jpeg', width = 8, height = 6, units = 'in',res=800)
+viz + theme(legend.position="right")
+dev.off() ##parentheses empty
+```
+
+```{r, Fig.2 BOXPLOT, using this fig in manuscript}
+
+Fig.1 <- ggplot(mr.gr.dat, aes(x=Treatment, y=RQ, color = Treatment)) +
+  geom_boxplot(coef = 5, width= 0.5) +
+  geom_point(
+    aes(fill = Habitat),
+    shape = 21,
+    color = "black",
+    position = position_jitterdodge(
+      jitter.width = 0.3,
+      dodge.width = 0.9
+    ),
+    size = 2.5,
+    stroke = .5
+  ) +
+  geom_point(stat = 'summary', fun = mean, shape = '+', size = 6,
+             color = 'blue', position = position_dodge(0.9)) +
+  xlab("Habitat") +
+  theme_bw()+
+  facet_grid(brain.region~GENE.x, scales ="free_y")+
+  theme(panel.grid.major =element_blank(), panel.grid.minor =element_blank())+
+  theme(axis.title.x = element_text(margin = margin(t = 15))) +
+  ylab("Relative mRNA expression")+
+  guides(color = guide_legend(title = "Habitat"))+
+    scale_color_manual(values = c("Urban" = "grey60", "Rural" = "green4"))+
+  scale_fill_manual(
+    values = c("Urban" = "grey60", "Rural" = "green4"))+
+  scale_x_discrete(expand = expansion(mult = c(0.1, 0.1)))
+Fig.1
+
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='mr.gr.boxplot.jpeg', width = 8, height = 6, units = 'in',res=800)
+Fig.1 + theme(legend.position="none")
+dev.off() ##parentheses empty
+```
+
+```{r, visualize data: AGE regression, Fig. }
+
+# Ensure Age is numeric
+mr.gr.dat$Age <- as.numeric(as.character(mr.gr.dat$Age))
+
+Fig.2 <- ggplot(data = mr.gr.dat, aes(y = RQ, x = Age, color = Habitat, fill = Habitat)) +
+
+  geom_point(
+  aes(fill = Habitat),
+  shape = 21,
+  color = "black",
+  size = 2.5,
+  stroke = 0.5,
+  position = position_dodge(width = 0.4)
+) +
+
+  geom_smooth(aes(group = Habitat), method = "lm", se = TRUE) +
+
+  scale_color_manual(
+    values = c("Urban" = "grey60", "Rural" = "green4"),
+    name = "Habitat"
+  ) +
+  scale_fill_manual(
+    values = c("Urban" = "grey60", "Rural" = "green4"),
+    name = "Habitat"
+  ) +
+
+  scale_x_continuous(breaks = 5:10) +   # <- here
+
+  theme_bw() +
+
+  labs(
+    y = "Relative mRNA expression",
+    x = "Age (days)"
+  ) +
+
+  facet_grid(brain.region ~ GENE.x, scales = "free") +
+
+  theme(
+    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank(),
+    strip.placement = "outside",
+    axis.title.x = element_text(size = 15),
+    axis.title.y = element_text(size = 15),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 12),
+    text = element_text(size = 16)
+  )
+
+Fig.2
+
+
+#create a tiff image for presentations/pubs
+dev.off()
+jpeg(file='mr.gr.AGE.no.bhco.jpeg', width = 8, height = 6, units = 'in',res=800)
+Fig.2 + theme(legend.position="right")
+dev.off() ##parentheses empty
+```
+
+```{r, dd.ct as a function of treatment: HYPO}
+#only use this for subsetting brain regions.. but we're not doing that
+hypo.dat=mr.gr.dat %>% 
+  filter(brain.region=="HYPO")
+
+lmm.1<-lmer(dd.ct~Treatment+GENE.x+Age+mean.cent.day+brain.region+(1|Nest.id)+(1|SAMPLE), data = mr.gr.dat)
+
+#Summary plots for the model
+check_model(lmm.1)
+
+hist(residuals(lmm.1))
+
+shapiro.test(residuals(lmm.1))
+
+summary(lmm.1)
+anova(lmm.1)
+#No real effects here, other than on day
+plot(allEffects(lmm.1))
+
+#exporting results
+res.pro.table.1 <- as.data.frame(coef(summary(lmm.1)))
+#write.csv(res.pro.table.1,"3.29.26.nestling.mr.gr.geneXhabitatXage.results1.csv")
+```
+
+```{r, dd.ct by brain region and habitat}
+
+#using this model for the gene expression analysis
+lmm.2<-lmer(dd.ct~Treatment+brain.region+GENE.x+Age+mean.cent.day+Sex+(1|SAMPLE.ID), data = mr.gr.dat)
+
+#lmm.2<-lmer(dd.ct~Treatment+GENE.x+Age+day+(1|Nest.id)+(1|SAMPLE.ID)+(1|brain.region), data = mr.gr.dat)
+#Summary plots for the model
+check_model(lmm.2)
+
+hist(residuals(lmm.2))
+
+shapiro.test(residuals(lmm.2))
+
+summary(lmm.2)
+#anova(lmm.2)
+emm_hab <- emmeans(lmm.2, ~ Treatment+Age)
+emm_hab
+#No real effects here, other than on day
+plot(allEffects(lmm.2))
+#res.pro.table <- as.data.frame(coef(summary(lmm.2)))
+#write.csv(res.pro.table,"3.5.26.nestling.mr.gr.results.csv")
+```
