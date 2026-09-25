@@ -40,7 +40,7 @@ We compared baseline plasma corticosterone (2017 cohort) and hippocampal (Hp) an
 
 ## Notes
 
-- `2022_Nestlings_HYPO_HP_MR_GR.Rmd` reads a nestling sex file (`Nestling_sex_4.1.26_dropped_sample_11.csv`) that will be added to this repository.
+- In `2022_Nestling_MR_GR_qPCR_data.csv`, `SAMPLE` IDs are region-specific (HY-n = hypothalamus, HP-n = hippocampus of the same nestling); the .Rmd derives a nestling ID (`SAMPLE.ID`) from the shared number for the individual random effect.
 - Analyses were run in R v4.6.0 with lme4, lmerTest, emmeans, performance, and ggplot2 (see package calls at the top of each .Rmd).
 - Place all files in one folder (or open them within an R project) so the relative file paths resolve.
 
