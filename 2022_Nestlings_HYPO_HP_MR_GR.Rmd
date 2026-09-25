@@ -51,11 +51,8 @@ library(tayloRswift)
 qpcr.all<-read.csv("2022_Nestling_MR_GR_qPCR_data.csv")
 #MR and GR rows (with ACTB reference values) for both brain regions
 
-#now add nestling sex to the data sheet
-sex.dat<-read.csv("Nestling_sex_4.1.26_dropped_sample_11.csv")
-
-#merge the data sheets
-qpcr.all <-merge(qpcr.all, sex.dat, by= c("SAMPLE.ID"))
+#nestling identity: HY-n (hypothalamus) and HP-n (hippocampus) are the same bird
+qpcr.all$SAMPLE.ID <- sub("^(HY|HP)-", "", qpcr.all$SAMPLE)
 ```
 
 ```{r, turning data into real date}
@@ -259,7 +256,7 @@ res.pro.table.1 <- as.data.frame(coef(summary(lmm.1)))
 ```{r, dd.ct by brain region and habitat}
 
 #using this model for the gene expression analysis
-lmm.2<-lmer(dd.ct~Treatment+brain.region+GENE.x+Age+mean.cent.day+Sex+(1|SAMPLE.ID), data = mr.gr.dat)
+lmm.2<-lmer(dd.ct~Treatment+brain.region+GENE.x+Age+mean.cent.day+(1|SAMPLE.ID), data = mr.gr.dat)
 
 #lmm.2<-lmer(dd.ct~Treatment+GENE.x+Age+day+(1|Nest.id)+(1|SAMPLE.ID)+(1|brain.region), data = mr.gr.dat)
 #Summary plots for the model
